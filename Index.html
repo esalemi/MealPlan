@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Healthy Meal Planner</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: auto;
+        }
+
+        .card {
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin: 10px 0;
+        }
+
+        .button {
+            padding: 10px;
+            background: #28a745;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+
+        .button:hover {
+            background: #218838;
+        }
+
+        .remove-button {
+            background: #dc3545;
+            color: white;
+            padding: 5px;
+            border: none;
+            cursor: pointer;
+        }
+
+        .remove-button:hover {
+            background: #c82333;
+        }
+    </style>
+    <script src="meals.js"></script>
+    <script>
+        console.log(meals); // Debug to check if it's loaded
+    </script>
+    <script src="ingredientCategories.js"></script>
+
+</head>
+
+<body>
+    <div class="container">
+        <h1>Salemi Healthy Meal Planner</h1>
+        <select id="mealSelect" onchange="displayRecipe()">
+            <option value="">-- Select a Meal --</option>
+        </select>
+        <button class="button" onclick="addMeal()">+</button>
+        <h2>Recipe Details</h2>
+        <div id="recipeDetails" class="card"></div>
+        <h2>Selected Meals</h2>
+        <div id="selectedMeals"></div>
+        <button class="button" onclick="generateShoppingList()">Generate Shopping List</button>
+        <h2>Shopping List</h2>
+        <ul id="shoppingList"></ul>
+    </div>
+
+    <script>
+
+        const ingredientCategories = window.ingredientCategories;
+        console.log("Loaded Categories:", ingredientCategories);
+        let selectedMeals = [];
+
+        function displayRecipe() {
+            let mealName = document.getElementById("mealSelect").value;
+            let detailsDiv = document.getElementById("recipeDetails");
+            if (mealName) {
+                let meal = meals[mealName];
+                detailsDiv.innerHTML = `
+                    <strong>${mealName}</strong><br>
+                    <p><strong>Cook Time:</strong> ${meal.cookTime}</p>
+                    <p><strong>Ingredients:</strong> ${meal.ingredients
+                        .map((ing) => `${ing.quantity} ${ing.unit} ${ing.name}`)
+                        .join(", ")
+                    }</p>
+                    <p><strong>Instructions:</strong> ${meal.instructions}</p>
+                    <p><strong>Nutrition:</strong> ${meal.nutrition}</p>
+                `;
+            } else {
+                detailsDiv.innerHTML = "";
+            }
+        }
+
+        function addMeal() {
+            let mealName = document.getElementById("mealSelect").value;
+            if (mealName && !selectedMeals.includes(mealName)) {
+                selectedMeals.push(mealName);
+                updateSelectedMeals();
+            }
+        }
+
+        function updateSelectedMeals() {
+            let container = document.getElementById("selectedMeals");
+            container.innerHTML = selectedMeals.map(meal =>
+                `<div class='card'>
+                    <strong>${meal}</strong>
+                    <button class='remove-button' onclick='removeMeal("${meal}")'>-</button>
+                </div>`
+            ).join("");
+        }
+
+        function removeMeal(mealName) {
+            selectedMeals = selectedMeals.filter(meal => meal !== mealName);
+            updateSelectedMeals();
+        }
+
+
+        function updateCost(ingredient, cost) {
+            let storedData = JSON.parse(localStorage.getItem(ingredient)) || {};
+            storedData.cost = cost;
+            localStorage.setItem(ingredient, JSON.stringify(storedData));
+        }
+
+        function getIngredientCategory(ingredient) {
+            // Remove parentheses content (e.g., "or dairy-free alternative")
+            let cleanedIngredient = ingredient
+                .replace(/\(.*?\)/g, "") // Remove anything in parentheses
+                .replace(/^[0-9/]+( cup| tbsp| tsp| ounce| oz| grams| g| ml| liter| lb| lbs| pinch| can| package| slice| clove| head| bunch| stalks| leaves)?\s*/i, "") // Remove leading quantities
+                .replace(/,?\s*(sliced|fried|diced|chopped|minced|shredded|grated|crushed|peeled|cooked|roasted|boiled|steamed|extra virgin|fresh|ground|powdered|softened|melted|rinsed|drained|whole|halved|cubed|mashed|fine|coarse|thinly sliced|thick cut|boneless|skinless|raw|organic|wild caught|frozen)/gi, "") // Remove preparation methods
+                .replace(/\s+/g, " ") // Replace multiple spaces with a single space
+                .trim()
+                .toLowerCase(); // Convert to lowercase for case-insensitive matching
+
+
+            for (const [category, items] of Object.entries(ingredientCategories)) {
+                if (items.some(i => cleanedIngredient.includes(i.toLowerCase()))) { // Check if part of the name matches
+                    // console.log(`Matched ${cleanedIngredient} with category: ${category}`);
+                    return category;
+                }
+            }
+            console.log(`No match found for ${cleanedIngredient}, defaulting to "Other"`);
+            return "Other"; // Default category if no match found
+        }
+
+
+
+
+        window.onload = function () {
+            let dropdown = document.getElementById("mealSelect");
+            Object.keys(meals).forEach(meal => {
+                let option = document.createElement("option");
+                option.value = meal;
+                option.textContent = meal;
+                dropdown.appendChild(option);
+            });
+        };
+
+        function generateShoppingList() {
+    let ingredientsList = [];
+
+    // Loop through selected meals and gather ingredients
+    selectedMeals.forEach(meal => {
+        meals[meal].ingredients.forEach(ingredient => {
+            // Push the ingredient object into the list
+            ingredientsList.push({
+                name: ingredient.name,
+                quantity: ingredient.quantity,
+                unit: ingredient.unit,
+                meal: meal // Keep track of which meal the ingredient belongs to
+            });
+        });
+    });
+
+    // Generate the shopping list UI as a table
+    let shoppingListHTML = "<table border='1' style='width: 100%; border-collapse: collapse; margin-left: 0; text-align: left;'><thead><tr>"
+        + "<th style='text-align: left;'>Set</th>"
+        + "<th style='text-align: left; width: 50%;'>Ingredient</th>"
+        + "<th style='text-align: left; width: 20%;'>QT</th>"
+        + "<th style='width: 150px; text-align: left;'>Link</th>"
+        + "<th style='text-align: left; width: 8%;'>Cost</th>"
+        + "<th style='text-align: left;'><button onclick='resetStock()'>Stock</button></th>"
+        + "</tr></thead><tbody>";
+
+    let groupedIngredients = {}; // This object is for grouping by category, but we will repeat ingredients
+
+    // Group ingredients by category and repeat them
+    ingredientsList.forEach(ingredient => {
+        let category = getIngredientCategory(ingredient.name);
+
+        if (!groupedIngredients[category]) {
+            groupedIngredients[category] = [];
+        }
+
+        // Add the ingredient to the corresponding category
+        groupedIngredients[category].push(ingredient);
+    });
+
+    // Sort categories alphabetically
+    Object.keys(groupedIngredients).sort().forEach(category => {
+        shoppingListHTML += `<tr style='background-color: #f0f0f0; text-align: left; font-weight: bold;'><td colspan='6'>${category}</td></tr>`;
+        
+        // Sort ingredients alphabetically within each category
+        groupedIngredients[category].sort((a, b) => a.name.localeCompare(b.name)).forEach(ingredient => {
+            let storedData = JSON.parse(localStorage.getItem(ingredient.name)) || {};
+            let isChecked = storedData.isChecked ? 'checked' : '';
+            let isDisabled = storedData.isChecked ? '' : 'disabled';
+            let rowBackground = storedData.stock === "No" ? "background-color: #ffcccc;" : "";
+            let linkDisplay = storedData.isChecked ? `<input type="text" id="link-${ingredient.name}" value="${storedData.link || ''}" onchange="updateLink('${ingredient.name}', this.value)" ${isDisabled} style='width: 140px;'>` : `<a href="${storedData.link || '#'}" target="_blank" id="link-display-${ingredient.name}">BUY</a>`;
+
+            shoppingListHTML += `
+                <tr id='row-${ingredient.name}' style='${rowBackground}'>
+                    <td style='text-align: left;'>
+                        <input type="checkbox" id="check-${ingredient.name}" onchange="toggleEdit('${ingredient.name}')" ${isChecked}>
+                    </td>
+                    <td style='text-align: left; width: 50%;'>${ingredient.name}</td>
+                    <td style='text-align: left; width: 20%;'>${ingredient.quantity} ${ingredient.unit}</td>
+                    <td id="link-cell-${ingredient.name}" style='width: 150px; text-align: left;'>${linkDisplay}</td>
+                    <td style='text-align: left; width: 8%;'>
+                        <input type="text" id="cost-${ingredient.name}" value="$${storedData.cost || '0.00'}" ${isDisabled} style='width: 60px;'>
+                    </td>
+                    <td style='text-align: left;'>
+                        <select id="stock-${ingredient.name}" onchange="updateStock('${ingredient.name}', this.value)" ${isDisabled}>
+                            <option value="Yes" ${storedData.stock === 'Yes' ? 'selected' : ''}>Yes</option>
+                            <option value="No" ${storedData.stock === 'No' ? 'selected' : ''}>No</option>
+                            <option value="On Order" ${storedData.stock === 'On Order' ? 'selected' : ''}>On Order</option>
+                        </select>
+                    </td>
+                </tr>
+            `;
+        });
+    });
+
+    shoppingListHTML += "</tbody></table>";
+
+    document.getElementById("shoppingList").innerHTML = shoppingListHTML;
+}
+
+// Function to reset all stock values to "No"
+function resetStock() {
+    document.querySelectorAll("select[id^='stock-']").forEach(select => {
+        select.value = "No";
+        updateStock(select.id.replace('stock-', ''), "No");
+    });
+}
+
+// Function to update stock value in localStorage and update row color
+function updateStock(ingredient, value) {
+    let storedData = JSON.parse(localStorage.getItem(ingredient)) || {};
+    storedData.stock = value;
+    localStorage.setItem(ingredient, JSON.stringify(storedData));
+    
+    // Update row background color dynamically
+    let row = document.getElementById(`row-${ingredient}`);
+    if (row) {
+        row.style.backgroundColor = value === "No" ? "#ffcccc" : "";
+    }
+}
+
+// Function to enable/disable editing based on checkbox
+function toggleEdit(ingredient) {
+    let checkbox = document.getElementById(`check-${ingredient}`);
+    let costField = document.getElementById(`cost-${ingredient}`);
+    let stockField = document.getElementById(`stock-${ingredient}`);
+    let linkCell = document.getElementById(`link-cell-${ingredient}`);
+
+    let storedData = JSON.parse(localStorage.getItem(ingredient)) || {};
+    storedData.isChecked = checkbox.checked;
+    localStorage.setItem(ingredient, JSON.stringify(storedData));
+
+    if (checkbox.checked) {
+        costField.removeAttribute("disabled");
+        stockField.removeAttribute("disabled");
+        linkCell.innerHTML = `<input type="text" id="link-${ingredient}" value="${storedData.link || ''}" onchange="updateLink('${ingredient}', this.value)" style='width: 140px;'>`;
+    } else {
+        costField.setAttribute("disabled", "true");
+        stockField.setAttribute("disabled", "true");
+        linkCell.innerHTML = `<a href="${storedData.link || '#'}" target="_blank" id="link-display-${ingredient}">BUY</a>`;
+    }
+}
+
+// Function to update link value in localStorage
+function updateLink(ingredient, value) {
+    let storedData = JSON.parse(localStorage.getItem(ingredient)) || {};
+    storedData.link = value;
+    localStorage.setItem(ingredient, JSON.stringify(storedData));
+}
+
+
+    </script>
+</body>
+
+</html>
